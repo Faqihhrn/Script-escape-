@@ -1,4 +1,541 @@
 --[[
+  COBRAX AI - BRAINROT MAP CONTROLLER
+  ROBLOX DELTA EXECUTOR SCRIPT
+  GUI RAPIH | BUKA-TUTUP | MINIMIZE/MAXIMIZE
+  FITUR: Mini Mode (kotak kecil) -> Full Mode (kotak besar)
+--]]
+
+-- ============== SERVICES ==============
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local player = Players.LocalPlayer
+
+-- ============== GUI VARIABLES ==============
+local isMinimized = false
+local minimizedSize = UDim2.new(0, 50, 0, 50)      -- ukuran kecil (kotak)
+local maximizedSize = UDim2.new(0, 320, 0, 480)    -- ukuran besar (full)
+
+-- ============== CREATE MAIN GUI ==============
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "CobraX_BrainrotGUI"
+screenGui.Parent = player:WaitForChild("PlayerGui")
+screenGui.ResetOnSpawn = false
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+-- Background blur effect
+local blurEffect = Instance.new("BlurEffect")
+blurEffect.Name = "CobraX_Blur"
+blurEffect.Parent = game:GetService("Lighting")
+blurEffect.Enabled = false
+blurEffect.Size = 8
+
+-- ============== MAIN FRAME ==============
+local mainFrame = Instance.new("Frame")
+mainFrame.Parent = screenGui
+mainFrame.Size = maximizedSize
+mainFrame.Position = UDim2.new(0.5, -160, 0.5, -240)
+mainFrame.BackgroundColor3 = Color3.fromRGB(15, 20, 30)
+mainFrame.BackgroundTransparency = 0.08
+mainFrame.BorderSizePixel = 2
+mainFrame.BorderColor3 = Color3.fromRGB(255, 100, 200)
+mainFrame.ClipsDescendants = true
+mainFrame.Active = true
+mainFrame.Draggable = true
+
+-- Corner rounding
+local corner = Instance.new("UICorner")
+corner.Parent = mainFrame
+corner.CornerRadius = UDim.new(0, 12)
+
+-- ============== TITLE BAR ==============
+local titleBar = Instance.new("Frame")
+titleBar.Parent = mainFrame
+titleBar.Size = UDim2.new(1, 0, 0, 40)
+titleBar.BackgroundColor3 = Color3.fromRGB(255, 80, 160)
+titleBar.BackgroundTransparency = 0.15
+titleBar.BorderSizePixel = 0
+
+local titleCorner = Instance.new("UICorner")
+titleCorner.Parent = titleBar
+titleCorner.CornerRadius = UDim.new(0, 12)
+
+local titleText = Instance.new("TextLabel")
+titleText.Parent = titleBar
+titleText.Size = UDim2.new(0.7, 0, 1, 0)
+titleText.Position = UDim2.new(0.02, 0, 0, 0)
+titleText.Text = "🧠 BRAINROT MAP 🧠 | SKIBIDI MODE"
+titleText.TextColor3 = Color3.fromRGB(255, 255, 255)
+titleText.BackgroundTransparency = 1
+titleText.Font = Enum.Font.GothamBold
+titleText.TextSize = 14
+titleText.TextXAlignment = Enum.TextXAlignment.Left
+
+-- ============== MINIMIZE BUTTON (toggle) ==============
+local minimizeBtn = Instance.new("TextButton")
+minimizeBtn.Parent = titleBar
+minimizeBtn.Size = UDim2.new(0, 30, 0, 30)
+minimizeBtn.Position = UDim2.new(1, -35, 0, 5)
+minimizeBtn.Text = "🗕"
+minimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+minimizeBtn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+minimizeBtn.BackgroundTransparency = 0.9
+minimizeBtn.Font = Enum.Font.GothamBold
+minimizeBtn.TextSize = 16
+minimizeBtn.BorderSizePixel = 0
+
+local minimizeCorner = Instance.new("UICorner")
+minimizeCorner.Parent = minimizeBtn
+minimizeCorner.CornerRadius = UDim.new(1, 0)
+
+-- ============== CLOSE BUTTON ==============
+local closeBtn = Instance.new("TextButton")
+closeBtn.Parent = titleBar
+closeBtn.Size = UDim2.new(0, 30, 0, 30)
+closeBtn.Position = UDim2.new(1, -70, 0, 5)
+closeBtn.Text = "✕"
+closeBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
+closeBtn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+closeBtn.BackgroundTransparency = 0.9
+closeBtn.Font = Enum.Font.GothamBold
+closeBtn.TextSize = 16
+closeBtn.BorderSizePixel = 0
+
+local closeCorner = Instance.new("UICorner")
+closeCorner.Parent = closeBtn
+closeCorner.CornerRadius = UDim.new(1, 0)
+
+-- ============== CONTENT CONTAINER (untuk scroll/dimuat saat maximize) ==============
+local contentContainer = Instance.new("ScrollingFrame")
+contentContainer.Parent = mainFrame
+contentContainer.Size = UDim2.new(1, 0, 1, -45)
+contentContainer.Position = UDim2.new(0, 0, 0, 45)
+contentContainer.BackgroundTransparency = 1
+contentContainer.BorderSizePixel = 0
+contentContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
+contentContainer.ScrollBarThickness = 6
+contentContainer.ScrollBarImageColor3 = Color3.fromRGB(255, 80, 160)
+
+-- Canvas layout
+local canvasLayout = Instance.new("UIListLayout")
+canvasLayout.Parent = contentContainer
+canvasLayout.Padding = UDim.new(0, 8)
+canvasLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
+local padding = Instance.new("UIPadding")
+padding.Parent = contentContainer
+padding.PaddingLeft = UDim.new(0, 12)
+padding.PaddingRight = UDim.new(0, 12)
+padding.PaddingTop = UDim.new(0, 10)
+padding.PaddingBottom = UDim.new(0, 10)
+
+-- ============== BRAINROT MAP CONTENT ==============
+local function createCategory(title, icon, order)
+    local categoryFrame = Instance.new("Frame")
+    categoryFrame.Parent = contentContainer
+    categoryFrame.Size = UDim2.new(1, 0, 0, 45)
+    categoryFrame.BackgroundColor3 = Color3.fromRGB(30, 35, 50)
+    categoryFrame.BackgroundTransparency = 0.5
+    categoryFrame.BorderSizePixel = 0
+    categoryFrame.LayoutOrder = order
+    
+    local catCorner = Instance.new("UICorner")
+    catCorner.Parent = categoryFrame
+    catCorner.CornerRadius = UDim.new(0, 8)
+    
+    local catText = Instance.new("TextLabel")
+    catText.Parent = categoryFrame
+    catText.Size = UDim2.new(1, 0, 1, 0)
+    catText.Text = icon .. " " .. title
+    catText.TextColor3 = Color3.fromRGB(255, 200, 255)
+    catText.BackgroundTransparency = 1
+    catText.Font = Enum.Font.GothamBold
+    catText.TextSize = 14
+    catText.TextXAlignment = Enum.TextXAlignment.Left
+    catText.PaddingLeft = UDim.new(0, 12)
+    
+    return categoryFrame
+end
+
+local function createButton(text, callback, color, order)
+    local btn = Instance.new("TextButton")
+    btn.Parent = contentContainer
+    btn.Size = UDim2.new(1, 0, 0, 42)
+    btn.Text = text
+    btn.BackgroundColor3 = color or Color3.fromRGB(40, 45, 65)
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.BorderSizePixel = 0
+    btn.Font = Enum.Font.Gotham
+    btn.TextSize = 13
+    btn.LayoutOrder = order
+    
+    local btnCorner = Instance.new("UICorner")
+    btnCorner.Parent = btn
+    btnCorner.CornerRadius = UDim.new(0, 8)
+    
+    btn.MouseButton1Click:Connect(callback)
+    return btn
+end
+
+local function createToggle(text, configKey, defaultValue, order)
+    local frame = Instance.new("Frame")
+    frame.Parent = contentContainer
+    frame.Size = UDim2.new(1, 0, 0, 42)
+    frame.BackgroundColor3 = Color3.fromRGB(40, 45, 65)
+    frame.BackgroundTransparency = 0
+    frame.BorderSizePixel = 0
+    frame.LayoutOrder = order
+    
+    local btnCorner = Instance.new("UICorner")
+    btnCorner.Parent = frame
+    btnCorner.CornerRadius = UDim.new(0, 8)
+    
+    local label = Instance.new("TextLabel")
+    label.Parent = frame
+    label.Size = UDim2.new(0.7, 0, 1, 0)
+    label.Text = text
+    label.TextColor3 = Color3.fromRGB(255, 255, 255)
+    label.BackgroundTransparency = 1
+    label.Font = Enum.Font.Gotham
+    label.TextSize = 13
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.PaddingLeft = UDim.new(0, 12)
+    
+    local toggleBtn = Instance.new("TextButton")
+    toggleBtn.Parent = frame
+    toggleBtn.Size = UDim2.new(0, 80, 0, 30)
+    toggleBtn.Position = UDim2.new(1, -90, 0.5, -15)
+    toggleBtn.Text = defaultValue and "✅ ON" or "❌ OFF"
+    toggleBtn.BackgroundColor3 = defaultValue and Color3.fromRGB(0, 200, 100) or Color3.fromRGB(100, 50, 50)
+    toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    toggleBtn.BorderSizePixel = 0
+    toggleBtn.Font = Enum.Font.GothamBold
+    toggleBtn.TextSize = 12
+    
+    local toggleCorner = Instance.new("UICorner")
+    toggleCorner.Parent = toggleBtn
+    toggleCorner.CornerRadius = UDim.new(1, 0)
+    
+    local state = defaultValue
+    toggleBtn.MouseButton1Click:Connect(function()
+        state = not state
+        toggleBtn.Text = state and "✅ ON" or "❌ OFF"
+        toggleBtn.BackgroundColor3 = state and Color3.fromRGB(0, 200, 100) or Color3.fromRGB(100, 50, 50)
+        if callback then callback(state) end
+    end)
+    
+    return {frame = frame, getState = function() return state end}
+end
+
+local function createSlider(text, minVal, maxVal, defaultVal, callback, order)
+    local frame = Instance.new("Frame")
+    frame.Parent = contentContainer
+    frame.Size = UDim2.new(1, 0, 0, 60)
+    frame.BackgroundColor3 = Color3.fromRGB(40, 45, 65)
+    frame.BackgroundTransparency = 0
+    frame.BorderSizePixel = 0
+    frame.LayoutOrder = order
+    
+    local btnCorner = Instance.new("UICorner")
+    btnCorner.Parent = frame
+    
+    local label = Instance.new("TextLabel")
+    label.Parent = frame
+    label.Size = UDim2.new(1, 0, 0, 20)
+    label.Text = text .. ": " .. defaultVal
+    label.TextColor3 = Color3.fromRGB(255, 255, 255)
+    label.BackgroundTransparency = 1
+    label.Font = Enum.Font.Gotham
+    label.TextSize = 12
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.PaddingLeft = UDim.new(0, 12)
+    
+    local slider = Instance.new("Frame")
+    slider.Parent = frame
+    slider.Size = UDim2.new(0.9, 0, 0, 4)
+    slider.Position = UDim2.new(0.05, 0, 0.6, 0)
+    slider.BackgroundColor3 = Color3.fromRGB(80, 80, 100)
+    slider.BorderSizePixel = 0
+    
+    local fill = Instance.new("Frame")
+    fill.Parent = slider
+    fill.Size = UDim2.new((defaultVal - minVal) / (maxVal - minVal), 0, 1, 0)
+    fill.BackgroundColor3 = Color3.fromRGB(255, 80, 160)
+    fill.BorderSizePixel = 0
+    
+    local knob = Instance.new("TextButton")
+    knob.Parent = slider
+    knob.Size = UDim2.new(0, 16, 0, 16)
+    knob.Position = UDim2.new((defaultVal - minVal) / (maxVal - minVal), -8, 0.5, -8)
+    knob.Text = "●"
+    knob.TextColor3 = Color3.fromRGB(255, 255, 255)
+    knob.BackgroundTransparency = 1
+    knob.Font = Enum.Font.GothamBold
+    knob.TextSize = 16
+    
+    local value = defaultVal
+    local dragging = false
+    
+    knob.MouseButton1Down:Connect(function()
+        dragging = true
+    end)
+    
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
+        end
+    end)
+    
+    RunService.RenderStepped:Connect(function()
+        if dragging then
+            local mousePos = UserInputService:GetMouseLocation()
+            local sliderPos = slider.AbsolutePosition
+            local sliderWidth = slider.AbsoluteSize.X
+            local percent = math.clamp((mousePos.X - sliderPos.X) / sliderWidth, 0, 1)
+            value = minVal + (maxVal - minVal) * percent
+            value = math.floor(value)
+            fill.Size = UDim2.new(percent, 0, 1, 0)
+            knob.Position = UDim2.new(percent, -8, 0.5, -8)
+            label.Text = text .. ": " .. value
+            if callback then callback(value) end
+        end
+    end)
+    
+    return {frame = frame, getValue = function() return value end}
+end
+
+-- ============== BUILD CONTENT ==============
+local order = 1
+createCategory("🗺️ MAP CONTROL", order); order = order + 1
+
+local mapToggle = createToggle("🧠 BRAINROT MAP ACTIVE", "mapActive", true, order); order = order + 1
+local espToggle = createToggle("👁️ ESP PLAYER/MOB", "esp", true, order); order = order + 1
+
+createCategory("⚡ MOVEMENT", order); order = order + 1
+local speedSlider = createSlider("🏃 SPEED BOOST", 16, 100, 32, function(val)
+    local char = player.Character
+    if char and char:FindFirstChild("Humanoid") then
+        char.Humanoid.WalkSpeed = val
+    end
+end, order); order = order + 1
+
+local jumpToggle = createToggle("🦘 INFINITE JUMP", "infJump", true, order); order = order + 1
+local flyToggle = createToggle("🕊️ FLY MODE", "fly", false, order); order = order + 1
+
+createCategory("🛡️ COMBAT", order); order = order + 1
+local godToggle = createToggle("💀 GOD MODE", "godMode", true, order); order = order + 1
+local autoFarmToggle = createToggle("🤖 AUTO FARM", "autoFarm", true, order); order = order + 1
+
+createCategory("🎨 VISUAL", order); order = order + 1
+local rainbowToggle = createToggle("🌈 RAINBOW MAP", "rainbow", false, order); order = order + 1
+local blurToggle = createToggle("🌫️ BLUR EFFECT", "blur", false, order); order = order + 1
+
+-- Update canvas size
+canvasLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    contentContainer.CanvasSize = UDim2.new(0, 0, 0, canvasLayout.AbsoluteContentSize.Y + 20)
+end)
+
+-- ============== FUNCTIONALITY IMPLEMENTATION ==============
+-- God Mode
+RunService.Stepped:Connect(function()
+    if godToggle.getState() and player.Character and player.Character:FindFirstChild("Humanoid") then
+        local hum = player.Character.Humanoid
+        hum.Health = hum.MaxHealth
+        hum.BreakJointsOnDeath = false
+    end
+end)
+
+-- Infinite Jump
+local infiniteJumpActive = false
+UserInputService.JumpRequest:Connect(function()
+    if jumpToggle.getState() and player.Character and player.Character:FindFirstChild("Humanoid") then
+        player.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+    end
+end)
+
+-- Fly Mode
+local flying = false
+local bodyVel = nil
+
+flyToggle.getState = function() return flying end
+flyToggle.frame.MouseButton1Click = nil
+
+local function updateFlyMode()
+    local newState = flyToggle.getState()
+    if newState and not flying then
+        flying = true
+        local char = player.Character
+        if char and char:FindFirstChild("HumanoidRootPart") then
+            bodyVel = Instance.new("BodyVelocity")
+            bodyVel.MaxForce = Vector3.new(10000, 10000, 10000)
+            bodyVel.Velocity = Vector3.new(0, 0, 0)
+            bodyVel.Parent = char.HumanoidRootPart
+            if char:FindFirstChild("Humanoid") then
+                char.Humanoid.PlatformStand = true
+            end
+        end
+    elseif not newState and flying then
+        flying = false
+        if bodyVel then bodyVel:Destroy() end
+        if player.Character and player.Character:FindFirstChild("Humanoid") then
+            player.Character.Humanoid.PlatformStand = false
+        end
+    end
+end
+
+flyToggle.frame.MouseButton1Click:Connect(function()
+    local newState = not flying
+    flyToggle.frame:FindFirstChildWhichIsA("TextButton").Text = newState and "✅ ON" or "❌ OFF"
+    flyToggle.frame:FindFirstChildWhichIsA("TextButton").BackgroundColor3 = newState and Color3.fromRGB(0, 200, 100) or Color3.fromRGB(100, 50, 50)
+    updateFlyMode()
+end)
+
+RunService.RenderStepped:Connect(function()
+    if flying and bodyVel and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+        local move = Vector3.new(0, 0, 0)
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then move = move + Vector3.new(0, 0, -1) end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then move = move + Vector3.new(0, 0, 1) end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then move = move + Vector3.new(-1, 0, 0) end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then move = move + Vector3.new(1, 0, 0) end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then move = move + Vector3.new(0, 1, 0) end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then move = move + Vector3.new(0, -1, 0) end
+        if move.Magnitude > 0 then
+            bodyVel.Velocity = move.Unit * 60
+        else
+            bodyVel.Velocity = Vector3.new(0, 0, 0)
+        end
+    end
+end)
+
+-- Blur Effect
+blurToggle.frame.MouseButton1Click:Connect(function()
+    local state = blurToggle.getState()
+    blurEffect.Enabled = state
+end)
+
+-- Rainbow Map Effect
+local rainbowHue = 0
+RunService.RenderStepped:Connect(function()
+    if rainbowToggle.getState() then
+        rainbowHue = (rainbowHue + 0.005) % 1
+        local color = Color3.fromHSV(rainbowHue, 1, 0.7)
+        mainFrame.BorderColor3 = color
+        titleBar.BackgroundColor3 = color
+        titleBar.BackgroundTransparency = 0.3
+    else
+        mainFrame.BorderColor3 = Color3.fromRGB(255, 100, 200)
+        titleBar.BackgroundColor3 = Color3.fromRGB(255, 80, 160)
+        titleBar.BackgroundTransparency = 0.15
+    end
+end)
+
+-- Auto Farm Simple
+spawn(function()
+    while wait(0.5) do
+        if autoFarmToggle.getState() then
+            for _, obj in ipairs(workspace:GetDescendants()) do
+                if obj:IsA("Model") and obj:FindFirstChild("Humanoid") and obj ~= player.Character then
+                    local hum = obj.Humanoid
+                    if hum.Health > 0 then
+                        local hrp = obj:FindFirstChild("HumanoidRootPart") or obj:FindFirstChild("Torso")
+                        if hrp and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                            player.Character.HumanoidRootPart.CFrame = CFrame.new(hrp.Position + Vector3.new(0, 2, 0))
+                            wait(0.1)
+                        end
+                    end
+                end
+            end
+        end
+    end
+end)
+
+-- ESP
+local espObjects = {}
+local function updateESP()
+    if not espToggle.getState() then
+        for _, obj in pairs(espObjects) do pcall(function() obj:Destroy() end) end
+        espObjects = {}
+        return
+    end
+    
+    for _, obj in pairs(espObjects) do pcall(function() obj:Destroy() end) end
+    espObjects = {}
+    
+    for _, entity in ipairs(workspace:GetDescendants()) do
+        if entity:IsA("Model") and entity:FindFirstChild("Humanoid") and entity ~= player.Character then
+            local hrp = entity:FindFirstChild("HumanoidRootPart") or entity:FindFirstChild("Torso")
+            if hrp then
+                local box = Instance.new("BoxHandleAdornment")
+                box.Adornee = hrp
+                box.Size = Vector3.new(4, 4, 4)
+                box.Color3 = Color3.fromRGB(255, 50, 100)
+                box.Transparency = 0.5
+                box.AlwaysOnTop = true
+                box.Parent = player.PlayerGui
+                table.insert(espObjects, box)
+            end
+        end
+    end
+end
+
+spawn(function()
+    while wait(1) do updateESP() end
+end)
+
+-- ============== MINIMIZE / MAXIMIZE FUNCTION ==============
+local function toggleMinimize()
+    isMinimized = not isMinimized
+    local targetSize = isMinimized and minimizedSize or maximizedSize
+    local targetPosX = isMinimized and 1 or 0.5
+    local targetOffsetX = isMinimized and -25 or -160
+    local targetPosY = isMinimized and 1 or 0.5
+    local targetOffsetY = isMinimized and -25 or -240
+    
+    local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    local sizeTween = TweenService:Create(mainFrame, tweenInfo, {Size = targetSize})
+    local posTween = TweenService:Create(mainFrame, tweenInfo, {Position = UDim2.new(targetPosX, targetOffsetX, targetPosY, targetOffsetY)})
+    
+    sizeTween:Play()
+    posTween:Play()
+    
+    -- Hide content when minimized
+    contentContainer.Visible = not isMinimized
+    minimizeBtn.Text = isMinimized and "🗖" or "🗕"
+    
+    -- Change title text when minimized
+    if isMinimized then
+        titleText.Text = "🧠"
+    else
+        titleText.Text = "🧠 BRAINROT MAP 🧠 | SKIBIDI MODE"
+    end
+end
+
+minimizeBtn.MouseButton1Click:Connect(toggleMinimize)
+
+-- ============== CLOSE / HIDE GUI ==============
+closeBtn.MouseButton1Click:Connect(function()
+    screenGui.Enabled = false
+    blurEffect.Enabled = false
+    game:GetService("StarterGui"):SetCore("SendNotification", {
+        Title = "🐍 COBRAX AI",
+        Text = "GUI hidden. Type /reload in console to show again.",
+        Duration = 3
+    })
+end)
+
+-- ============== RE-ENABLE GUI VIA CONSOLE ==============
+-- Kalo kepencet close, bisa pake command: _G.ShowCobraXGUI()
+_G.ShowCobraXGUI = function()
+    screenGui.Enabled = true
+    if blurToggle and blurToggle.getState() then
+        blurEffect.Enabled = true
+    end
+end
+
+-- ============== INITIAL NOTIFICATION ==============
+game:GetService("StarterGui"):SetCore("SendNotification", {
+    Title = "🐍 COBRAX BRAINRO--[[
   COBRAX AI - DIVINE INFINITY CELESTIAL SCRIPT
   ANTI-BAN + AUTO FARM + AUTO UPGRADE + AUTO DAILY
   OPTIMIZED FOR DELTA EXECUTOR
